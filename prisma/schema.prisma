@@ -1,0 +1,133 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String?
+  email        String   @unique
+  passwordHash String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  accounts   Account[]
+  sessions   Session[]
+  resumes    Resume[]
+  userJobs   UserJob[]
+  jobMatches JobMatch[]
+  savedJobs  SavedJob[]
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+model Resume {
+  id             String   @id @default(uuid())
+  userId         String
+  fileUrl        String
+  parsedText     String?
+  structuredData Json?
+  skills         String[]
+  createdAt      DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model JobMatch {
+  id         String @id @default(uuid())
+  userId     String
+  jobId      String
+  matchScore Float
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId])
+  @@index([userId])
+  @@index([jobId])
+}
+
+model SavedJob {
+  id     String @id @default(uuid())
+  userId String
+  jobId  String
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId])
+  @@index([userId])
+  @@index([jobId])
+}
+
+model Job {
+  id             String   @id @default(uuid())
+  externalId     String   @unique
+  title          String
+  company        String
+  location       String?
+  description    String?
+  applyUrl       String?
+  source         String
+  employmentType String?
+  postedAt       DateTime?
+  skills         Json?
+  createdAt      DateTime @default(now())
+  userJobs       UserJob[]
+
+  @@index([source])
+  @@index([postedAt])
+}
+
+model UserJob {
+  id        String   @id @default(uuid())
+  userId    String
+  jobId     String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  job  Job  @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, jobId])
+  @@index([userId])
+  @@index([jobId])
+}
