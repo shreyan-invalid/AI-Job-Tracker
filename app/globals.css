@@ -215,9 +215,21 @@ a {
   background: #0f172a;
   color: #e2e8f0;
   padding: 0.85rem;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  white-space: pre;
+  overflow-y: hidden;
   overflow-x: auto;
   font-size: 0.82rem;
   line-height: 1.35;
+}
+
+.json-details {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 @media (max-width: 860px) {
