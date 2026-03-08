@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 
 type ExperienceItem = {
   title: string;
@@ -98,10 +99,12 @@ function formatDate(value: string): string {
 }
 
 export function ResumeUploadForm() {
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [resumes, setResumes] = useState<ResumeListItem[]>([]);
   const [isLoadingResumes, setIsLoadingResumes] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
+  const [isFetchingJobsAfterUpload, setIsFetchingJobsAfterUpload] = useState(false);
   const [deletingResumeId, setDeletingResumeId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -109,7 +112,8 @@ export function ResumeUploadForm() {
   const [listError, setListError] = useState<string | null>(null);
 
   const hasReachedLimit = resumes.length >= MAX_RESUME_COUNT;
-  const isBusy = isUploading || isLoadingResumes || deletingResumeId !== null;
+  const isBusy =
+    isUploading || isFetchingJobsAfterUpload || isLoadingResumes || deletingResumeId !== null;
 
   const fileMetadata = useMemo(() => {
     if (!file) {
@@ -188,6 +192,8 @@ export function ResumeUploadForm() {
     setError(null);
     setSuccessMessage(null);
 
+    let uploadedSuccessfully = false;
+
     try {
       const formData = new FormData();
       formData.append("file", file);
@@ -209,12 +215,37 @@ export function ResumeUploadForm() {
       setSuccessMessage(data.message);
       setFile(null);
       await loadResumes();
+      uploadedSuccessfully = true;
     } catch (uploadError) {
       console.error("Upload request failed", uploadError);
       setResult(null);
       setError("Something went wrong while uploading your resume.");
     } finally {
       setIsUploading(false);
+    }
+
+    if (!uploadedSuccessfully) {
+      return;
+    }
+
+    setIsFetchingJobsAfterUpload(true);
+
+    try {
+      const response = await fetch("/api/jobs/fetch", { method: "POST" });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => ({}))) as UploadErrorResponse;
+        throw new Error(payload.message ?? "Resume uploaded, but failed to fetch jobs.");
+      }
+
+      setSuccessMessage("Resume uploaded and jobs fetched. Redirecting to Jobs...");
+      router.push("/jobs");
+      router.refresh();
+    } catch (jobFetchError) {
+      console.error(jobFetchError);
+      setError(jobFetchError instanceof Error ? jobFetchError.message : "Failed to fetch jobs.");
+    } finally {
+      setIsFetchingJobsAfterUpload(false);
     }
   };
 
@@ -317,7 +348,11 @@ export function ResumeUploadForm() {
         {fileMetadata ? <p className="muted">Selected: {fileMetadata}</p> : null}
 
         <button className="button" type="submit" disabled={isBusy || !file || hasReachedLimit}>
-          {isUploading ? "Uploading and parsing..." : "Upload Resume"}
+          {isUploading
+            ? "Uploading and parsing..."
+            : isFetchingJobsAfterUpload
+              ? "Fetching jobs from resumes..."
+              : "Upload Resume"}
         </button>
       </form>
 
@@ -360,7 +395,7 @@ export function ResumeUploadForm() {
             </div>
           </div>
 
-          <details>
+          <details className="json-details">
             <summary>Structured JSON</summary>
             <pre className="result-json">
               {JSON.stringify(result.structuredData, null, 2)}

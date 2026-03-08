@@ -77,7 +77,19 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = session.user.id;
+    const existingUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true }
+    });
+
+    if (!existingUser) {
+      return NextResponse.json(
+        { message: "Session is invalid for this database. Please log in again." },
+        { status: 401 }
+      );
+    }
+
+    const userId = existingUser.id;
     const resumeCount = await prisma.resume.count({
       where: { userId }
     });
